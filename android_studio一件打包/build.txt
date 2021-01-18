@@ -1,0 +1,182 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion '27.0.3'
+
+    defaultConfig {
+        applicationId 'com.nzyl.androidofficialtestnz11'
+        minSdkVersion 19
+        targetSdkVersion 26
+        versionCode 7
+        versionName '10.0'
+
+
+        externalNativeBuild {
+            ndkBuild {
+                if (!project.hasProperty("PROP_NDK_MODE") || PROP_NDK_MODE.compareTo('none') != 0) {
+                    // skip the NDK Build step if PROP_NDK_MODE is none
+                    targets 'cocos2djs'
+                    arguments 'NDK_TOOLCHAIN_VERSION=4.9'
+                    arguments 'APP_PLATFORM=android-'+PROP_TARGET_SDK_VERSION
+
+                    def module_paths = [project.file("../../../cocos2d-x"),
+                                        project.file("../../../cocos2d-x/cocos"),
+                                        project.file("../../../cocos2d-x/external")]
+                    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                        arguments 'NDK_MODULE_PATH=' + module_paths.join(";")
+                    } else {
+                        arguments 'NDK_MODULE_PATH=' + module_paths.join(':')
+                    }
+
+
+
+                    arguments '-j' + Runtime.runtime.availableProcessors()
+                    abiFilters.addAll(PROP_APP_ABI.split(':').collect { it as String })
+                }
+            }
+        }
+    }
+    sourceSets.main {
+        java.srcDir "src"
+        res.srcDir "res"
+        jniLibs.srcDir "libs"
+        manifest.srcFile "AndroidManifest.xml"
+    }
+    externalNativeBuild {
+        ndkBuild {
+            if (!project.hasProperty("PROP_NDK_MODE") || PROP_NDK_MODE.compareTo('none') != 0) {
+                // skip the NDK Build step if PROP_NDK_MODE is none
+                path "jni/Android.mk"
+            }
+        }
+    }
+    signingConfigs {
+
+        release {
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                storeFile file(RELEASE_STORE_FILE)
+                storePassword RELEASE_STORE_PASSWORD
+                keyAlias RELEASE_KEY_ALIAS
+                keyPassword RELEASE_KEY_PASSWORD
+            }
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+        debug {
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                storeFile file(RELEASE_STORE_FILE)
+                storePassword RELEASE_STORE_PASSWORD
+                keyAlias RELEASE_KEY_ALIAS
+                keyPassword RELEASE_KEY_PASSWORD
+            }
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                signingConfig signingConfigs.release
+            }
+
+            externalNativeBuild {
+                ndkBuild {
+                    arguments 'NDK_DEBUG=0'
+                }
+            }
+        }
+
+        debug {
+            externalNativeBuild {
+                ndkBuild {
+                    arguments 'NDK_DEBUG=1'
+                }
+            }
+        }
+    }
+    productFlavors {
+    }
+
+    packagingOptions {
+        pickFirst 'lib/armeabi/libNodeMediaClient.so'
+        pickFirst 'google/protobuf/any.proto'
+        pickFirst 'META-INF/INDEX.LIST'
+        pickFirst 'google/protobuf/field_mask.proto'
+        pickFirst 'google/protobuf/compiler/plugin.proto'
+        pickFirst 'google/protobuf/duration.proto'
+        pickFirst 'google/protobuf/type.proto'
+        pickFirst 'google/protobuf/wrappers.proto'
+        pickFirst 'google/protobuf/descriptor.proto'
+        pickFirst 'google/protobuf/api.proto'
+        pickFirst 'google/protobuf/source_context.proto'
+        pickFirst 'META-INF/io.netty.versions.properties'
+        pickFirst 'google/protobuf/empty.proto'
+        pickFirst 'google/protobuf/struct.proto'
+        pickFirst 'google/protobuf/timestamp.proto'
+    }
+}
+
+android.applicationVariants.all { variant ->
+    // delete previous files first
+    delete "${buildDir}/intermediates/assets/${variant.dirName}"
+
+    variant.mergeAssets.doLast {
+        copy {
+           from "${buildDir}/../../../../../res"
+           into "${buildDir}/intermediates/assets/${variant.dirName}/res"
+        }
+
+        copy {
+            from "${buildDir}/../../../../../src"
+            into "${buildDir}/intermediates/assets/${variant.dirName}/src"
+        }
+
+        copy {
+            from "${buildDir}/../../../../../main.js"
+            from "${buildDir}/../../../../../project.json"
+            into "${buildDir}/intermediates/assets/${variant.dirName}"
+        }
+
+        copy {
+            from "../../../cocos2d-x/cocos/scripting/js-bindings/script"
+            into "${buildDir}/intermediates/assets/${variant.dirName}/script"
+        }
+    }
+}
+
+repositories{
+    flatDir{
+        dirs 'libs'
+    }
+}
+
+apply plugin: 'replugin-host-gradle'
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    compile project(':libcocos2dx')
+    compile 'com.mcxiaoke.packer-ng:helper:2.0.0'
+    compile 'com.google.android.gms:play-services-analytics:10.2.1'
+
+    compile (name: 'alipaySdk-15.7.9-20200727142846', ext: 'aar')
+    compile 'com.android.support:support-v4:28.0.0'
+    compile "com.android.support:appcompat-v7:28.0.0"
+
+//    implementation 'com.android.support:support-v4:27.1.1'
+    implementation "com.qihoo360.replugin:replugin-host-lib:${RP_VERSION}"
+    implementation 'com.github.bumptech.glide:glide:4.8.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.8.0'
+    implementation 'pub.devrel:easypermissions:1.3.0'
+
+}
+
+repluginHostConfig {
+    useAppCompat = false
+    // 可以在这里自定义常驻进程的名字
+    // persistentName = ":XXXXService"
+}
